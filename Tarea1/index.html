@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Prompt Dino</title>
+
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #f7f7f7;
+    }
+
+    canvas {
+        display: block;
+        margin: auto;
+        background: white;
+        border: 2px solid #ccc;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="900" height="300"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const GROUND = 200;
+
+let speed = 6;
+let score = 0;
+let highScore = localStorage.getItem("dinoHS") || 0;
+let gameOver = false;
+
+let minDistance = 300; 
+
+/* 
+   CARGAR IMÁGENES
+*/
+
+const dino1 = new Image();
+const dino2 = new Image();
+const cactusImg = new Image();
+
+dino1.src = "assets/dino1.png";
+dino2.src = "assets/dino2.png";
+cactusImg.src = "assets/cactus.png";
+
+/* 
+    PLAYER
+*/
+
+class Player {
+    constructor() {
+        this.x = 50;
+        this.y = GROUND;
+        this.width = 50;
+        this.height = 50;
+        this.velocityY = 0;
+        this.gravity = 1;
+        this.jumpPower = -18;
+        this.isJumping = false;
+        this.frame = 0;
+    }
+
+    draw() {
+        let img = this.frame === 0 ? dino1 : dino2;
+        ctx.drawImage(img, this.x, this.y, this.width, this.height);
+    }
+
+    update() {
+        this.velocityY += this.gravity;
+        this.y += this.velocityY;
+
+        if (this.y > GROUND) {
+            this.y = GROUND;
+            this.isJumping = false;
+        }
+
+        this.frame = (this.frame + 1) % 20 < 10 ? 0 : 1;
+    }
+
+    jump() {
+        if (!this.isJumping) {
+            this.velocityY = this.jumpPower;
+            this.isJumping = true;
+        }
+    }
+}
+
+/*
+   OBSTÁCULO
+*/
+
+class Cactus {
+    constructor() {
+        this.x = canvas.width;
+        this.y = GROUND;
+        this.width = 40;
+        this.height = 50;
+    }
+
+    draw() {
+        ctx.drawImage(cactusImg, this.x, this.y, this.width, this.height);
+    }
+
+    update() {
+        this.x -= speed;
+    }
+}
+
+/*
+   VARIABLES
+*/
+
+const player = new Player();
+let obstacles = [];
+
+/*
+   COLISIÓN
+*/
+
+function collision(a, b) {
+    return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+    );
+}
+
+/*
+   REINICIAR JUEGO
+*/
+
+function resetGame() {
+    score = 0;
+    speed = 6;
+    minDistance = 300;
+    gameOver = false;
+    obstacles = [];
+    player.y = GROUND;
+    player.velocityY = 0;
+    requestAnimationFrame(loop);
+}
+
+/*
+   LOOP PRINCIPAL
+*/
+
+function loop() {
+
+    if (gameOver) {
+        ctx.fillStyle = "black";
+        ctx.font = "40px Arial";
+        ctx.fillText("GAME OVER", 330, 140);
+
+        ctx.font = "20px Arial";
+        ctx.fillText("Presiona R o ENTER para reiniciar", 260, 180);
+        return;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#999";
+    ctx.fillRect(0, 250, canvas.width, 50);
+
+    player.update();
+    player.draw();
+
+    if (obstacles.length === 0 || 
+        canvas.width - obstacles[obstacles.length - 1].x > minDistance) {
+        
+        if (Math.random() < 0.02) {
+            obstacles.push(new Cactus());
+        }
+    }
+
+    obstacles.forEach((obs, index) => {
+        obs.update();
+        obs.draw();
+
+        if (collision(player, obs)) {
+            gameOver = true;
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem("dinoHS", highScore);
+            }
+        }
+
+        if (obs.x + obs.width < 0) {
+            obstacles.splice(index, 1);
+        }
+    });
+
+    score++;
+
+    if (score % 500 === 0) {
+        speed += 0.5;
+
+        if (minDistance > 150) {
+            minDistance -= 20;
+        }
+    }
+
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText("Score: " + score, 730, 30);
+    ctx.fillText("Record: " + highScore, 720, 55);
+
+    requestAnimationFrame(loop);
+}
+
+/*
+   CONTROLES
+*/
+
+document.addEventListener("keydown", function(e) {
+
+    if (e.code === "Space" && !gameOver) {
+        player.jump();
+    }
+
+    if ((e.code === "KeyR" || e.code === "Enter") && gameOver) {
+        resetGame();
+    }
+
+});
+
+/*
+   INICIAR
+*/
+
+window.onload = function() {
+    requestAnimationFrame(loop);
+};
+</script>
+
+</body>
+</html>

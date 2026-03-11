@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Dino Runner</title>
+<style>
+body { margin:0; overflow:hidden; background:#f7f7f7; }
+canvas { display:block; margin:auto; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="900" height="300"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const GROUND = 220;
+let speed = 8;
+let score = 0;
+let highscore = localStorage.getItem("dinoHS") || 0;
+let gameOver = false;
+
+// --------- Cargar imágenes ----------
+const dino1 = new Image();
+const dino2 = new Image();
+const cactusImg = new Image();
+const birdImg = new Image();
+const groundImg = new Image();
+
+dino1.src = "assets/dino1.png";
+dino2.src = "assets/dino2.png";
+cactusImg.src = "assets/cactus.png";
+birdImg.src = "assets/bird.png";
+groundImg.src = "assets/ground.png";
+
+// --------- Player ----------
+class Player {
+    constructor(){
+        this.x = 80;
+        this.y = GROUND;
+        this.w = 44;
+        this.h = 47;
+        this.velY = 0;
+        this.jumping = false;
+        this.frame = 0;
+    }
+
+    jump(){
+        if(!this.jumping){
+            this.velY = -15;
+            this.jumping = true;
+        }
+    }
+
+    update(){
+        this.velY += 1;
+        this.y += this.velY;
+
+        if(this.y >= GROUND){
+            this.y = GROUND;
+            this.velY = 0;
+            this.jumping = false;
+        }
+
+        this.frame++;
+    }
+
+    draw(){
+        let img = (Math.floor(this.frame/10)%2===0)? dino1 : dino2;
+        ctx.drawImage(img, this.x, this.y, this.w, this.h);
+    }
+
+    hitbox(){
+        return {x:this.x,y:this.y,w:this.w,h:this.h};
+    }
+}
+
+// --------- Obstáculos ----------
+class Obstacle {
+    constructor(){
+        this.type = Math.random()>0.5?"cactus":"bird";
+        this.x = canvas.width;
+
+        if(this.type==="cactus"){
+            this.y = GROUND;
+            this.w = 30;
+            this.h = 50;
+            this.img = cactusImg;
+        } else {
+            this.y = GROUND - 60;
+            this.w = 46;
+            this.h = 40;
+            this.img = birdImg;
+        }
+    }
+
+    update(){ this.x -= speed; }
+
+    draw(){
+        ctx.drawImage(this.img, this.x, this.y, this.w, this.h);
+    }
+
+    hitbox(){
+        return {x:this.x,y:this.y,w:this.w,h:this.h};
+    }
+}
+
+// --------- Colisión ----------
+function collide(a,b){
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+}
+
+const player = new Player();
+let obstacles = [];
+let spawnTimer = 0;
+
+// --------- Loop ----------
+function loop(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // suelo
+    ctx.drawImage(groundImg, 0, GROUND+40, 900, 20);
+
+    if(!gameOver){
+        player.update();
+
+        spawnTimer++;
+        if(spawnTimer > 80){
+            obstacles.push(new Obstacle());
+            spawnTimer = 0;
+        }
+
+        obstacles.forEach((o,i)=>{
+            o.update();
+            if(collide(player.hitbox(), o.hitbox())){
+                gameOver = true;
+                if(score>highscore){
+                    highscore = score;
+                    localStorage.setItem("dinoHS", highscore);
+                }
+            }
+            if(o.x < -50) obstacles.splice(i,1);
+        });
+
+        score++;
+        if(score%500===0) speed++;
+    }
+
+    player.draw();
+    obstacles.forEach(o=>o.draw());
+
+    ctx.font="20px Arial";
+    ctx.fillText("Score: "+score, 700, 30);
+    ctx.fillText("HighScore: "+highscore, 700, 55);
+
+    if(gameOver){
+        ctx.font="30px Arial";
+        ctx.fillText("GAME OVER - R", 320, 140);
+    }
+
+    requestAnimationFrame(loop);
+}
